@@ -30,10 +30,7 @@ const storage = multer.diskStorage({
     
 app.get("/", (req, res) => {
   res.send("Backend is running on Render!");
-});
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
-});
+},)
 
 const upload = multer({ storage: storage });
 
