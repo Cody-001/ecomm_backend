@@ -20,6 +20,7 @@ mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log("MongoDB connected"))
   .catch(err => console.error("MongoDB connection error:", err));
 
+
 const storage = multer.diskStorage({
   destination: "./upload/images",
   filename: (req, file, cb) => {
@@ -63,7 +64,9 @@ const fetchuser = async (req, res, next) => {
 //     res.status(401).json({ error: "Invalid token" });
 //   }
 // };
-
+app.get("/", (req,res)=>{
+  res.send("Backend is running")
+})
 app.post("/addproduct", async (req, res) => {
   let product = await Products.find();
   let id;
