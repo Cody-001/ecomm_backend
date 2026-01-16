@@ -26,6 +26,15 @@ const storage = multer.diskStorage({
     return cb(null, `${file.fieldname}_${Date.now()}${path.extname(file.originalname)}`);
   }
 });
+
+    
+app.get("/", (req, res) => {
+  res.send("Backend is running on Render!");
+});
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
+});
+
 const upload = multer({ storage: storage });
 
 app.post("/upload", upload.single("product"), (req, res) => {
