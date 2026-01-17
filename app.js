@@ -36,10 +36,11 @@ app.get("/", (req, res) => {
 const upload = multer({ storage: storage });
 
 app.post("/upload", upload.single("product"), (req, res) => {
-  // Dynamic URL based on request host, works in both local and production
-  const imageUrl = `${req.protocol}://${req.get("host")}/images/${req.file.filename}`;
+  const protocol = req.get("host").includes("localhost") ? "http" : "https";
+  const imageUrl = `${protocol}://${req.get("host")}/images/${req.file.filename}`;
   res.json({ success: true, image_url: imageUrl });
 });
+
 
 const fetchuser = async (req, res, next) => {
   const token = req.header("auth-token");
