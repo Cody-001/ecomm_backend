@@ -67,7 +67,7 @@ const fetchuser = async (req, res, next) => {
 app.get("/", (req,res)=>{
   res.send("Backend is running")
 })
-app.post("/addproduct", async (req, res) => {
+app.post("/addproduct",  async (req, res) => {
   let product = await Products.find();
   let id;
   if (product.length > 0) {
@@ -152,7 +152,7 @@ app.post("/addtocart", fetchuser, async (req, res) => {
   console.log("Added", req.body.itemId);
   let userData = await User.findOne({ _id: req.user.id });
   userData.cartData[req.body.itemId] += 1;
-  await User.findByIdAndUpdate(req.user.id, { cartData: userData.cartData });
+  await User.findByIdAndUpdate({_id:req.user.id}, { cartData: userData.cartData });
   res.send("Added");
 });
 
@@ -160,7 +160,7 @@ app.post("/removefromcart", fetchuser, async (req, res) => {
   console.log("Removed", req.body.itemId);
   let userData = await User.findOne({ _id: req.user.id });
   if (userData.cartData[req.body.itemId] > 0) userData.cartData[req.body.itemId] -= 1;
-  await User.findByIdAndUpdate(req.user.id, { cartData: userData.cartData });
+  await User.findByIdAndUpdate({_id:req.user.id}, { cartData: userData.cartData });
   res.send("Removed");
 });
 
