@@ -8,6 +8,7 @@ const Products = require("./models/products");
 const multer = require("multer");
 const User = require("./models/user");
 const Admin = require("./models/admin");
+const fileUpload = require('express-fileupload');
 require("dotenv").config();
 
 const port = process.env.PORT || 3000;
@@ -15,30 +16,26 @@ const port = process.env.PORT || 3000;
 app.use("/images", express.static(path.join(__dirname, "upload/images")));
 app.use(express.json());
 app.use(cors());
+app.use(fileUpload());
 
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log("MongoDB connected"))
   .catch(err => console.error("MongoDB connection error:", err));
 
 
-const storage = multer.diskStorage({
-  destination: "./upload/images",
-  filename: (req, file, cb) => {
-    return cb(null, `${file.fieldname}_${Date.now()}${path.extname(file.originalname)}`);
+
+
+app.post('/upload', (req, res) => {
+  if (!req.files || !req.files.product) {
+    return res.status(400).json({ error: 'No file uploaded' });
   }
-});
-
-    
-app.get("/", (req, res) => {
-  res.send("Backend is running on Render!");
-},)
-
-const upload = multer({ storage: storage });
-
-app.post("/upload", upload.single("product"), (req, res) => {
-  const protocol = req.get("host").includes("localhost") ? "http" : "https";
-  const imageUrl = `${protocol}://${req.get("host")}/images/${req.file.filename}`;
-  res.json({ success: true, image_url: imageUrl });
+  const productImage = req.files.product;
+  const uploadPath = __dirname + '/upload/images/' + productImage.name;
+  productImage.mv(uploadPath, (err) => {
+    if (err) return res.status(500).json({ error: err });
+    const imageUrl = `${req.protocol}://${req.get('host')}/images/${productImage.name}`;
+    res.json({ success: true, image_url: imageUrl });
+  });
 });
 
 
