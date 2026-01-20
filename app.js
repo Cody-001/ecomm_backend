@@ -1,47 +1,37 @@
 const express = require("express");
 const app = express();
 const mongoose = require("mongoose");
-const path = require("path");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
 const Products = require("./models/products");
-const multer = require("multer");
 const User = require("./models/user");
 const Admin = require("./models/admin");
+const expfileupld = require("express-fileupload");
 require("dotenv").config();
+const fs = require("fs");
+const path = require("path");
+const cloudinary = require("./cloudinary");
 
 const port = process.env.PORT || 3000;
-
-app.use("/images", express.static(path.join(__dirname, "upload/images")));
-app.use(express.json());
-app.use(cors({
-  origin: 'https://your-vercel-app.vercel.app',
-}));
 
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log("MongoDB connected"))
   .catch(err => console.error("MongoDB connection error:", err));
 
 
-const storage = multer.diskStorage({
-  destination: "./upload/images",
-  filename: (req, file, cb) => {
-    return cb(null, `${file.fieldname}_${Date.now()}${path.extname(file.originalname)}`);
-  }
-});
+app.use(
+  expfileupld({
+    useTempFiles: true,
+    tempFileDir: "/tmp/",
+  })
+);
 
-    
-app.get("/", (req, res) => {
-  res.send("Backend is running on Render!");
-},)
+  app.use(express.json());
+app.use(cors());
 
-const upload = multer({ storage: storage });
-
-app.post("/upload", upload.single("product"), (req, res) => {
-  const protocol = req.get("host").includes("localhost") ? "http" : "https";
-  const imageUrl = `${protocol}://${req.get("host")}/images/${req.file.filename}`;
-  res.json({ success: true, image_url: imageUrl });
-});
+app.get("/", (req,res)=>{
+  res.send("Backend is running") 
+})
 
 
 const fetchuser = async (req, res, next) => {
@@ -59,7 +49,7 @@ const fetchuser = async (req, res, next) => {
   }
 };
 
-// Uncomment and use if needed
+
 // const fetchAdmin = async (req, res, next) => {
 //   const token = req.header("auth-token");
 //   if (!token) {
@@ -73,33 +63,55 @@ const fetchuser = async (req, res, next) => {
 //     res.status(401).json({ error: "Invalid token" });
 //   }
 // };
-app.get("/", (req,res)=>{
-  res.send("Backend is running")
-})
-app.post("/addproduct",  async (req, res) => {
-  let product = await Products.find();
-  let id;
-  if (product.length > 0) {
-    let lastProductArray = product.slice(-1);
-    let lastProduct = lastProductArray[0];
-    id = lastProduct.id + 1;
-  } else {
-    id = 1;
+app.use(
+  "/uploads",
+  express.static(path.join(__dirname, "uploads"))
+); 
+
+app.post("/addproduct", async (req, res) => {
+  try {
+    console.log("REQ.BODY:", req.body);
+    console.log("REQ.FILES:", req.files);
+
+    if (!req.files || !req.files.image) {
+      return res.status(400).json({ error: "Image is required" });
+    }
+
+    const imageFile = req.files.image;
+    console.log("imageFile:", imageFile);
+
+    const uploadResult = await cloudinary.uploader.upload(
+      imageFile.tempFilePath,
+      { folder: "products", resource_type: "auto" }
+    );
+    console.log("Cloudinary result:", uploadResult);
+    
+    const products = await Products.find().sort({ id: 1 });
+    const id = products.length > 0
+      ? products[products.length - 1].id + 1
+      : 1;
+
+    const newProduct = new Products({
+      id,
+      name: req.body.name,
+      image: uploadResult.secure_url,
+      category: req.body.category,
+      subcategory: req.body.subcategory,
+      new_price: req.body.new_price,
+      old_price: req.body.old_price,
+    });
+
+    await newProduct.save();
+    res.json({ success: true, product: newProduct });
+
+  } catch (error) {
+    console.error("Add product error:", error);
+    res.status(500).json({ error: "Server error" });
   }
-  const newProduct = new Products({
-    id: id,
-    name: req.body.name,
-    image: req.body.image,
-    category: req.body.category,
-    subcategory: req.body.subcategory,
-    new_price: req.body.new_price,
-    old_price: req.body.old_price
-  });
-  console.log(newProduct);
-  await newProduct.save();
-  console.log("saved");
-  res.json({ success: true, name: req.body.name });
 });
+
+
+
 
 app.post("/removeproduct", async (req, res) => {
   await Products.findOneAndDelete({ id: req.body.id });
