@@ -11,6 +11,7 @@ require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
 const cloudinary = require("./cloudinary");
+const Order = require("./models/order");
 
 const port = process.env.PORT || 3000;
 
@@ -35,19 +36,26 @@ app.get("/", (req,res)=>{
 
 
 const fetchuser = async (req, res, next) => {
-  const token = req.header("auth-token");
-  if (!token) {
-    res.status(401).send({ error: "Please authenticate using a valid token" });
-  } else {
-    try {
-      const data = jwt.verify(token, process.env.JWT_KEY);
-      req.user = data.user;
-      next();
-    } catch (error) {
-      res.status(401).send({ error: "Please authenticate using a valid token" });
+  try {
+    let token = req.header("auth-token") || req.header("authorization");
+
+    if (!token) {
+      return res.status(401).json({ error: "Please authenticate using a valid token" });
     }
+
+    if (token.startsWith("Bearer ")) {
+      token = token.slice(7, token.length).trim();
+    }
+
+    const data = jwt.verify(token, process.env.JWT_KEY);
+    req.user = data.user; 
+    next();
+  } catch (err) {
+    console.error("JWT error:", err);
+    res.status(401).json({ error: "Unauthorized: Invalid token" });
   }
 };
+
 
 
 // const fetchAdmin = async (req, res, next) => {
@@ -110,9 +118,6 @@ app.post("/addproduct", async (req, res) => {
   }
 });
 
-
-
-
 app.post("/removeproduct", async (req, res) => {
   await Products.findOneAndDelete({ id: req.body.id });
   console.log("removed");
@@ -120,10 +125,27 @@ app.post("/removeproduct", async (req, res) => {
 });
 
 app.get("/allproducts", async (req, res) => {
-  let product = await Products.find({});
-  console.log("all product fetched");
-  res.send(product);
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+   
+    const products = await Products.find({})
+      .sort({ id: -1 }) 
+      .skip(skip)
+      .limit(limit)
+      .select("id name image new_price old_price description"); // only needed fields
+
+    console.log(`Fetched page ${page} with ${products.length} products`);
+
+    res.json(products);
+  } catch (err) {
+    console.error("Error fetching products:", err);
+    res.status(500).json({ error: "Server error" });
+  }
 });
+
 
 app.post("/signup", async (req, res) => {
   let existingUser = await User.findOne({ email: req.body.email });
@@ -190,6 +212,64 @@ app.post("/getcart", fetchuser, async (req, res) => {
   let userData = await User.findOne({ _id: req.user.id });
   res.json(userData.cartData);
 });
+
+app.post("/order", fetchuser, async (req, res) => {
+  try {
+    const {
+      firstname,
+      lastname,
+      email,
+      phone,
+      companyName,
+      address,
+      country,
+      state,
+      city,
+      postcode,
+      differentAddress,
+      comments,
+      paymentMethod,
+      totalAmount
+    } = req.body;
+
+    const userId = req.user.id;
+
+  
+    if (!firstname || !lastname || !email || !phone || !address || !country || !state || !city || !postcode || !paymentMethod || !totalAmount) {
+      return res.status(400).json({ message: "All required fields must be provided" });
+    }
+
+    const newOrder = new Order({
+      userId,
+      firstname,
+      lastname,
+      email,
+      phone,
+      companyName,
+      address,
+      country,
+      state,
+      city,
+      postcode,
+      differentAddress: differentAddress || false,
+      comments,
+      paymentMethod,
+      totalAmount,
+      paymentStatus: "pending"
+    });
+
+    const savedOrder = await newOrder.save();
+
+    res.status(201).json({
+      message: "Order placed successfully",
+      order: savedOrder
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 
 app.listen(port, (error) => {
   if (!error) {
