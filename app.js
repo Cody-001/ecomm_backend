@@ -35,26 +35,25 @@ app.get("/", (req,res)=>{
 })
 
 
-const fetchuser = async (req, res, next) => {
+const fetchuser = (req, res, next) => {
+  const token = req.header("auth-token");
+
+  if (!token) {
+    return res.status(401).json({ error: "Access denied" });
+  }
+
   try {
-    let token = req.header("auth-token") || req.header("authorization");
-
-    if (!token) {
-      return res.status(401).json({ error: "Please authenticate using a valid token" });
-    }
-
-    if (token.startsWith("Bearer ")) {
-      token = token.slice(7, token.length).trim();
-    }
-
-    const data = jwt.verify(token, process.env.JWT_KEY);
-    req.user = data.user; 
+    const data = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = data.user;
     next();
-  } catch (err) {
-    console.error("JWT error:", err);
-    res.status(401).json({ error: "Unauthorized: Invalid token" });
+  } catch (error) {
+    return res.status(401).json({
+      error: "Session expired. Please login again",
+    });
   }
 };
+
+
 
 
 
@@ -126,19 +125,10 @@ app.post("/removeproduct", async (req, res) => {
 
 app.get("/allproducts", async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
-
-   
+     
     const products = await Products.find({})
       .sort({ id: -1 }) 
-      .skip(skip)
-      .limit(limit)
-      .select("id name image new_price old_price description"); // only needed fields
-
-    console.log(`Fetched page ${page} with ${products.length} products`);
-
+    
     res.json(products);
   } catch (err) {
     console.error("Error fetching products:", err);
@@ -161,8 +151,12 @@ app.post("/signup", async (req, res) => {
     cartData: cart,
   });
   await newUser.save();
-  const token = jwt.sign({ user: { id: newUser._id } }, process.env.JWT_KEY);
-  res.json({ success: true, token });
+    const token = jwt.sign(
+      { user: { id: newUser._id } },   
+      process.env.JWT_KEY,             
+      { expiresIn: "1h" }  
+    );
+    res.json({ success: true, token });
 });
 
 app.post("/login", async (req, res) => {
