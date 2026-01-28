@@ -164,13 +164,21 @@ app.post("/login", async (req, res) => {
   if (!checkUser) {
     return res.json({ success: false, error: "Wrong email" });
   }
+
   const passCompare = req.body.password === checkUser.password;
   if (!passCompare) {
     return res.json({ success: false, error: "Wrong password" });
   }
-  const token = jwt.sign({ user: { id: checkUser._id } }, process.env.JWT_KEY);
+
+  const token = jwt.sign(
+    { user: { id: checkUser._id } },
+    process.env.JWT_KEY,
+    { expiresIn: "1h" } 
+  );
+
   res.json({ success: true, token });
 });
+
 
 app.post("/adminlogin", async (req, res) => {
   const { email, password } = req.body;
